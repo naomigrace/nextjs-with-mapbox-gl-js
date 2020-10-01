@@ -6,19 +6,28 @@ const mapboxgl = require("mapbox-gl/dist/mapbox-gl.js");
 export default function Home() {
   const [pageIsMounted, setPageIsMounted] = useState(false);
 
+  mapboxgl.accessToken =
+    "pk.eyJ1Ijoid2FubmFkYyIsImEiOiJjazBja2M1ZzYwM2lnM2dvM3o1bmF1dmV6In0.50nuNnApjrJYkMfR2AUpXA";
+
   useEffect(() => {
     setPageIsMounted(true);
   }, []);
 
   useEffect(() => {
     if (pageIsMounted) {
-      mapboxgl.accessToken =
-        "pk.eyJ1Ijoid2FubmFkYyIsImEiOiJjazBja2M1ZzYwM2lnM2dvM3o1bmF1dmV6In0.50nuNnApjrJYkMfR2AUpXA";
-
       const map = new mapboxgl.Map({
         container: "my-map",
         style: "mapbox://styles/mapbox/streets-v11",
       });
+
+      map.addControl(
+        new mapboxgl.GeolocateControl({
+          positionOptions: {
+            enableHighAccuracy: true,
+          },
+          trackUserLocation: true,
+        })
+      );
     }
   }, [pageIsMounted]);
 

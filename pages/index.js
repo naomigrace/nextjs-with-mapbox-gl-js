@@ -18,6 +18,13 @@ export default function Home() {
       const map = new mapboxgl.Map({
         container: "my-map",
         style: "mapbox://styles/mapbox/streets-v11",
+        center: [-77.02, 38.887],
+        zoom: 12.5,
+        pitch: 45,
+        maxBounds: [
+          [-77.875588, 38.50705], // Southwest coordinates
+          [-76.15381, 39.548764], // Northeast coordinates
+        ],
       });
 
       map.on("load", function () {

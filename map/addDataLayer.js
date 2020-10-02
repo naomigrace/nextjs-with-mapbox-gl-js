@@ -1,14 +1,15 @@
 export function addDataLayer(map, data) {
-  // Add a new source from our GeoJSON data and
-  // set the 'cluster' option to true. GL-JS will
-  // add the point_count property to your source data.
-  map.addSource("dcmusic.live", {
-    type: "geojson",
-    data: data,
-    cluster: true,
-    clusterMaxZoom: 14,
-    clusterRadius: 50,
-  });
+  if (!map.getSource("dcmusic.live")) {
+    map.addSource("dcmusic.live", {
+      type: "geojson",
+      data: data,
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+    });
+  } else {
+    map.getSource("dcmusic.live").setData(data);
+  }
 
   map.addLayer({
     id: "data",

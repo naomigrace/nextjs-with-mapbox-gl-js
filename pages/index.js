@@ -1,6 +1,7 @@
 import Head from "next/head";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import { addDataLayer } from "../map/addDataLayer";
 import styles from "../styles/Home.module.css";
 const mapboxgl = require("mapbox-gl/dist/mapbox-gl.js");
 
@@ -17,6 +18,8 @@ async function fetcher(params) {
 
 export default function Home() {
   const [pageIsMounted, setPageIsMounted] = useState(false);
+  const [Map, setMap] = useState({});
+  const [mapLoaded, setMapLoaded] = useState(false);
   const { data, error } = useSWR("/api/liveMusic", fetcher);
 
   if (error) {
@@ -31,8 +34,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (pageIsMounted) {
-      const map = new mapboxgl.Map({
+    if (pageIsMounted && data) {
+      const Map = new mapboxgl.Map({
         container: "my-map",
         style: "mapbox://styles/mapbox/streets-v11",
         center: [-77.02, 38.887],
@@ -44,98 +47,37 @@ export default function Home() {
         ],
       });
 
-      map.on("load", function () {
-        // Add a new source from our GeoJSON data and
-        // set the 'cluster' option to true. GL-JS will
-        // add the point_count property to your source data.
-        map.addSource("dcmusic.live", {
-          type: "geojson",
-          data: data,
-          cluster: true,
-          clusterMaxZoom: 14,
-          clusterRadius: 50,
-        });
+      setMap(Map);
 
-        map.addLayer({
-          id: "clusters",
-          type: "circle",
-          source: "dcmusic.live",
-          filter: ["has", "point_count"],
-          paint: {
-            // Use step expressions (https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-step)
-            // with three steps to implement three types of circles:
-            //   * Blue, 20px circles when point count is less than 100
-            //   * Yellow, 30px circles when point count is between 100 and 750
-            //   * Pink, 40px circles when point count is greater than or equal to 750
-            "circle-color": [
-              "step",
-              ["get", "point_count"],
-              "#51bbd6",
-              100,
-              "#f1f075",
-              750,
-              "#f28cb1",
-            ],
-            "circle-radius": [
-              "step",
-              ["get", "point_count"],
-              20,
-              100,
-              30,
-              750,
-              40,
-            ],
-          },
-        });
+      Map.on("idle", function () {
+        setMapLoaded(true);
+      });
 
-        map.addLayer({
-          id: "cluster-count",
-          type: "symbol",
-          source: "dcmusic.live",
-          filter: ["has", "point_count"],
-          layout: {
-            "text-field": "{point_count_abbreviated}",
-            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
-            "text-size": 12,
-          },
-        });
-
-        map.addLayer({
-          id: "unclustered-point",
-          type: "circle",
-          source: "dcmusic.live",
-          filter: ["!", ["has", "point_count"]],
-          paint: {
-            "circle-color": "#11b4da",
-            "circle-radius": 4,
-            "circle-stroke-width": 1,
-            "circle-stroke-color": "#fff",
-          },
-        });
-
+      Map.on("load", function () {
         // inspect a cluster on click
-        map.on("click", "clusters", function (e) {
-          var features = map.queryRenderedFeatures(e.point, {
-            layers: ["clusters"],
+        Map.on("click", "data", function (e) {
+          var features = Map.queryRenderedFeatures(e.point, {
+            layers: ["data"],
           });
           var clusterId = features[0].properties.cluster_id;
-          map
-            .getSource("dcmusic.live")
-            .getClusterExpansionZoom(clusterId, function (err, zoom) {
+          Map.getSource("dcmusic.live").getClusterExpansionZoom(
+            clusterId,
+            function (err, zoom) {
               if (err) return;
 
-              map.easeTo({
+              Map.easeTo({
                 center: features[0].geometry.coordinates,
                 zoom: zoom,
               });
-            });
+            }
+          );
         });
 
         // When a click event occurs on a feature in
         // the unclustered-point layer, open a popup at
         // the location of the feature, with
         // description HTML from its properties.
-        map.on("click", "unclustered-point", function (e) {
+        Map.on("click", "unclustered-point", function (e) {
           var coordinates = e.features[0].geometry.coordinates.slice();
           var mag = e.features[0].properties.mag;
           var tsunami;
@@ -158,27 +100,35 @@ export default function Home() {
             .setHTML(
               "magnitude: " + mag + "<br>Was there a tsunami?: " + tsunami
             )
-            .addTo(map);
+            .addTo(Map);
         });
 
-        map.on("mouseenter", "clusters", function () {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", "clusters", function () {
-          map.getCanvas().style.cursor = "";
-        });
+        Map.addControl(
+          new mapboxgl.GeolocateControl({
+            positionOptions: {
+              enableHighAccuracy: true,
+            },
+            trackUserLocation: true,
+          })
+        );
+
+        addDataLayer(Map, data);
       });
 
-      map.addControl(
-        new mapboxgl.GeolocateControl({
-          positionOptions: {
-            enableHighAccuracy: true,
-          },
-          trackUserLocation: true,
-        })
-      );
+      Map.on("mouseenter", "data", function () {
+        Map.getCanvas().style.cursor = "pointer";
+      });
+      Map.on("mouseleave", "data", function () {
+        Map.getCanvas().style.cursor = "";
+      });
     }
-  }, [pageIsMounted]);
+  }, [pageIsMounted, setMap, data]);
+
+  useEffect(() => {
+    if (Map && mapLoaded && data && Map.getSource("dcmusic.live")) {
+      Map.getSource("dcmusic.live").setData(data);
+    }
+  }, [mapLoaded, data, Map]);
 
   return (
     <div className={styles.container}>
